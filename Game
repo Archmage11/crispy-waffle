@@ -1,0 +1,580 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.image.BufferStrategy;
+import java.util.ArrayList;
+import java.util.concurrent.ThreadLocalRandom;
+
+public class Game extends JFrame implements KeyListener {
+
+	Vector p1 = new Vector(random(100, 600), random(50, 400));
+	Vector p2 = new Vector(random(100, 600), random(50, 700));
+	Vector p3 = new Vector(random(100, 600), random(50, 700));
+	Vector p4 = new Vector(random(100, 600), random(50, 700));
+	Vector p5 = new Vector(random(100, 600), random(50, 700));
+	Vector p6 = new Vector(random(100, 600), random(50, 700));
+	Vector p7 = new Vector(random(100, 600), random(50, 700));
+
+	Vector s1 = new Vector(random(15, 40), random(100, 300));
+	Vector s2 = new Vector(random(15, 40), random(100, 300));
+	Vector s3 = new Vector(random(15, 40), random(100, 300));
+	Vector s4 = new Vector(random(15, 40), random(100, 250));
+	Vector s5 = new Vector(random(15, 40), random(100, 200));
+	Vector s6 = new Vector(random(15, 40), random(100, 200));
+	Vector s7 = new Vector(random(15, 40), random(100, 200));
+
+	private int d1 = (int) (random(1, 180));
+	private int d2 = (int) (random(1, 180));
+	private int d3 = (int) (random(1, 180));
+	private int d4 = (int) (random(1, 180));
+	private int d5 = (int) (random(1, 180));
+	private int d6 = (int) (random(1, 180));
+	private int d7 = (int) (random(1, 180));
+
+	Vector pball = new Vector(-100, -100); // set to 100 to not collide with wall at 0,0 before game begins
+	Vector vball = new Vector(0, 0);
+
+	Vector gr = new Vector(2.5f, 12);
+
+	private static final long serialVersionUID = 1L;
+	// window variables
+	private final int MAX_FPS;
+	private final int WIDTH;
+	private final int HEIGHT;
+
+	// double buffer
+	private BufferStrategy strategy;
+
+	// loop variables
+	private boolean isRunning = true;
+	private long rest = 0;
+
+	// timing variables
+	private float dt;
+	private long lastFrame;
+	private long startFrame;
+	private int fps;
+
+	// cannon angle & power control integers
+	private int cPower = 100;
+	private int cAngle = 0;
+
+	// ball vars
+	static boolean ballPlay = false;
+	boolean colliding = false;
+	int ballRadius = 10;
+
+	// velocity modifier
+	float vmod = 10.4f;
+	float gravmod = 1.0f;
+
+	int bouncesLeft;
+	int bounces;
+
+	float T = 0.01f;
+
+	public static void main(String[] args) {
+		Game game = new Game(700, 1000, 60);
+		game.run();
+
+	}
+
+	public Game(int width, int height, int fps) {
+		super("JFrame Demo");
+		this.MAX_FPS = fps;
+		this.WIDTH = width;
+		this.HEIGHT = height;
+
+	}
+
+	public static int random(int min, int max) {
+		return ThreadLocalRandom.current().nextInt(min, max + 1);
+	}
+
+	void init() {
+		// initialize JFrame
+		setPreferredSize(new Dimension(WIDTH, HEIGHT));
+		setLayout(null);
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+		setBounds(0, 0, WIDTH, HEIGHT);
+
+		setIgnoreRepaint(true);
+
+		setResizable(false);
+		setVisible(true);
+
+		// create double buffer strategy
+		createBufferStrategy(2);
+		strategy = getBufferStrategy();
+
+		lastFrame = System.currentTimeMillis();
+
+		addKeyListener(this);
+		setFocusable(true);
+
+	}
+
+	boolean checkCollision(Vector rectP, Vector rectSz, float rectD, Vector ballP, Vector ballV) {
+
+		Vector bottomright = Vector.add(rectP, rectSz);
+		Vector topright = new Vector(rectP.x + rectSz.x, rectP.y);
+		Vector bottomleft = new Vector(rectP.x, rectP.x + rectSz.y);
+
+		ArrayList<Vector> corners = new ArrayList<Vector>() {
+			{
+				add(rectP);
+				add(topright);
+				add(bottomright);
+				add(bottomleft);
+			}
+		};
+
+		for (int i = 1; i < corners.size(); i++) {
+			corners.get(i).add(Vector.rotate(Vector.sub(rectP, corners.get(i)), rectD));
+		}
+
+		Vector ballCheck = Vector.add(ballP, Vector.mult(ballV, T));
+
+		for (int i = 1; i < corners.size(); i++) {
+			if (intersecting(corners.get(i - 1), corners.get(i), ballP, ballCheck)) {
+				modifyVelocity(Vector.sub(corners.get(i - 1), corners.get(i)), ballV);
+				return true;
+			}
+		}
+		
+		return false;
+
+	}
+
+	boolean intersecting(Vector A, Vector B, Vector P, Vector Q) {
+		int case1 = (int) (((B.x - A.x) * (P.y - B.y)) - ((B.y - A.y) * (P.x - B.x)));
+		int case2 = (int) (((B.x - A.x) * (P.y - B.y)) - ((B.y - A.y) * (P.x - B.x)));
+
+		return !((case1 > 0 && case2 > 0) || (case1 < 0 && case2 < 0));
+	}
+
+	void modifyVelocity(Vector wall, Vector ballV) {
+		ballV.rotate(Vector.getAngle(ballV, wall) * -2.0f);
+	}
+
+	private void update() {
+
+		// update current fps
+		fps = (int) (1f / dt);
+
+		// d = (float) Math.toRadians(50);
+
+		pball.setX(pball.x + (vball.x * dt));
+		pball.setY(pball.y + (vball.y * dt));
+
+		// check collisions between rectangles
+		if ((collides(p1.ix, p1.iy, s1.ix, s1.iy, p2.ix, p2.iy, s2.ix, s2.iy))
+
+				|| (collides(p1.ix, p1.iy, s1.ix, s1.iy, p3.ix, p3.iy, s3.ix, s3.iy))
+				|| (collides(p1.ix, p1.iy, s1.ix, s1.iy, p4.ix, p4.iy, s4.ix, s4.iy))
+				|| (collides(p1.ix, p1.iy, s1.ix, s1.iy, p5.ix, p5.iy, s5.ix, s5.iy))
+				|| (collides(p1.ix, p1.iy, s1.ix, s1.iy, p6.ix, p6.iy, s6.ix, s6.iy))
+				|| (collides(p1.ix, p1.iy, s1.ix, s1.iy, p7.ix, p7.iy, s7.ix, s7.iy)) ||
+
+				(collides(p2.ix, p2.iy, s2.ix, s2.iy, p3.ix, p3.iy, s3.ix, s3.iy))
+				|| (collides(p2.ix, p2.iy, s2.ix, s2.iy, p4.ix, p4.iy, s4.ix, s4.iy))
+				|| (collides(p2.ix, p2.iy, s2.ix, s2.iy, p5.ix, p5.iy, s5.ix, s5.iy))
+				|| (collides(p2.ix, p2.iy, s2.ix, s2.iy, p6.ix, p6.iy, s6.ix, s6.iy))
+				|| (collides(p2.ix, p2.iy, s2.ix, s2.iy, p7.ix, p7.iy, s7.ix, s7.iy)) ||
+
+				(collides(p3.ix, p3.iy, s3.ix, s3.iy, p4.ix, p4.iy, s4.ix, s4.iy))
+				|| (collides(p3.ix, p3.iy, s3.ix, s3.iy, p5.ix, p5.iy, s5.ix, s5.iy))
+				|| (collides(p3.ix, p3.iy, s3.ix, s3.iy, p6.ix, p6.iy, s6.ix, s6.iy))
+				|| (collides(p3.ix, p3.iy, s3.ix, s3.iy, p7.ix, p7.iy, s7.ix, s7.iy)) ||
+
+				(collides(p4.ix, p4.iy, s4.ix, s4.iy, p5.ix, p5.iy, s5.ix, s5.iy))
+				|| (collides(p4.ix, p4.iy, s4.ix, s4.iy, p6.ix, p6.iy, s6.ix, s6.iy))
+				|| (collides(p4.ix, p4.iy, s4.ix, s4.iy, p7.ix, p7.iy, s7.ix, s7.iy)) ||
+
+				(collides(p5.ix, p5.iy, s5.ix, s5.iy, p6.ix, p6.iy, s6.ix, s6.iy))
+				|| (collides(p5.ix, p5.iy, s5.ix, s5.iy, p7.ix, p7.iy, s7.ix, s7.iy)) ||
+
+				(collides(p6.ix, p6.iy, s6.ix, s6.iy, p7.ix, p7.iy, s7.ix, s7.iy)))
+
+		{
+			p1.set(random(100, 600), random(50, 400));
+			p2.set(random(100, 600), random(50, 700));
+			p3.set(random(100, 600), random(50, 700));
+			p4.set(random(100, 600), random(50, 700));
+			p5.set(random(100, 600), random(50, 700));
+			p6.set(random(100, 600), random(50, 700));
+			p7.set(random(100, 600), random(50, 700));
+
+			s1.set(random(15, 40), random(100, 300));
+			s2.set(random(15, 40), random(100, 300));
+			s3.set(random(15, 40), random(100, 300));
+			s4.set(random(15, 40), random(100, 250));
+			s5.set(random(15, 40), random(100, 200));
+			s6.set(random(15, 40), random(100, 200));
+			s7.set(random(15, 40), random(100, 200));
+
+		}
+
+		checkCollision(p1, s1, (float) Math.toRadians(d1), pball, vball);
+		checkCollision(p2, s2, (float) Math.toRadians(d2), pball, vball);
+		System.err.println(checkCollision(p1, s1, (float) Math.toRadians(d1), pball, vball));
+		
+			
+		
+		
+		// if (checkcollide(d1, pball.ix, pball.iy, p1.ix, p1.iy, s1.ix, s1.iy)) {
+		//
+		// }
+		// if (checkcollide(d2, pball.ix, pball.iy, p2.ix, p2.iy, s2.ix, s2.iy)) {
+		//
+		// }
+		// if (checkcollide(d3, pball.ix, pball.iy, p3.ix, p3.iy, s3.ix, s3.iy)) {
+		//
+		// }
+		// if (checkcollide(d4, pball.ix, pball.iy, p4.ix, p4.iy, s4.ix, s4.iy)) {
+		//
+		// }
+		// if (checkcollide(d5, pball.ix, pball.iy, p5.ix, p5.iy, s5.ix, s5.iy)) {
+		//
+		// }
+		// if (checkcollide(d6, pball.ix, pball.iy, p6.ix, p6.iy, s6.ix, s6.iy)) {
+		//
+		// }
+		// if (checkcollide(d7, pball.ix, pball.iy, p7.ix, p7.iy, s7.ix, s7.iy)) {
+		//
+		// }
+		// if (checkcollide(0, pball.ix, pball.iy, 0, 0, 800, 10)) {
+		//
+		// }
+		// if (checkcollide(0, pball.ix, pball.iy, 0, 0, 10, 1000)) {
+		//
+		// }
+		// if (checkcollide(0, pball.ix, pball.iy, 800, 0, 10, 1000)) {
+		//
+		// }
+
+		// gravity
+		if (ballPlay) {
+
+			vball.setY(vball.iy += pball.iy * dt * gravmod);
+		}
+
+		if (pball.ix < 0 || pball.ix > 800 || pball.iy < 0 || pball.iy > 1000) {
+			ballPlay = false;
+		}
+
+	}
+
+	// public double findDistance(double fromX, double fromY, double toX, double
+	// toY) {
+	// double a = Math.abs(fromX - toX);
+	// double b = Math.abs(fromY - toY);
+	//
+	// return Math.sqrt((a * a) + (b * b));
+	// }
+	//
+	// public boolean checkcollide(int rot, int xball, int yball, int xrect, int
+	// yrect, int w, int h) {
+	//
+	// double unrotatedCircleX = Math.cos(Math.toRadians(-rot)) * (xball - (xrect +
+	// (1 / 2) * w))
+	// - Math.sin(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (xrect +
+	// (1 / 2) * w);
+	// double unrotatedCircleY = Math.sin(Math.toRadians(-rot)) * (xball - (xrect +
+	// (1 / 2) * w))
+	// + Math.cos(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (yrect +
+	// (1 / 2) * h);
+	//
+	// // Closest point in the rectangle to the center of circle rotated
+	// // backwards(unrotated)
+	// double closestX, closestY;
+	//
+	// // Find the unrotated closest x point from center of unrotated circle
+	// if (unrotatedCircleX < xrect)
+	// closestX = xrect;
+	// else if (unrotatedCircleX > xrect + w)
+	// closestX = xrect + w;
+	// else
+	// closestX = unrotatedCircleX;
+	//
+	// // Find the unrotated closest y point from center of unrotated circle
+	// if (unrotatedCircleY < yrect)
+	// closestY = yrect;
+	// else if (unrotatedCircleY > yrect + h)
+	// closestY = yrect + h;
+	// else
+	// closestY = unrotatedCircleY;
+	//
+	// // Determine collision
+	//
+	// double distance = findDistance(unrotatedCircleX, unrotatedCircleY, closestX,
+	// closestY);
+	// if (distance < ballRadius) {
+	// return true; // Collision
+	// } else
+	// return false;
+	// }
+
+	public void bcollide() {
+
+	}
+
+	private void draw() {
+
+		// get canvas
+		Graphics2D g = (Graphics2D) strategy.getDrawGraphics();
+
+		// clear screen
+		g.setColor(Color.blue);
+		g.fillRect(0, 0, WIDTH, HEIGHT);
+
+		if (ballPlay) {
+			g.setColor(Color.GREEN);
+			g.fillOval(pball.ix - 10, pball.iy - 10, ballRadius * 2, ballRadius * 2);
+
+		}
+
+		// draw cannon barrel
+		g.setColor(Color.BLACK);
+		g.translate(400, 1000);
+		g.rotate(Math.toRadians(cAngle));
+		g.fillRect(-15, -cPower, 30, cPower);
+		g.rotate(Math.toRadians(-cAngle));
+		g.translate(-400, -1000);
+
+		// draw cyan part of cannon
+		g.setColor(Color.CYAN);
+		g.fillArc(350, 965, 100, 100, 0, 180);
+
+		// draw rectangles
+		g.setColor(Color.DARK_GRAY);
+		g.translate(p1.ix, p1.iy);
+		g.rotate(Math.toRadians(d1));
+		g.fillRect(0, 0, s1.ix, s1.iy);
+		g.setColor(Color.BLACK);
+		g.drawRect(0, 0, s1.ix, s1.iy);
+		g.rotate(Math.toRadians(-d1));
+		g.translate(-p1.ix, -p1.iy);
+
+		g.setColor(Color.CYAN);
+		g.translate(p2.ix, p2.iy);
+		g.rotate(Math.toRadians(d2));
+		g.fillRect(0, 0, s2.ix, s2.iy);
+		g.setColor(Color.BLACK);
+		g.drawRect(0, 0, s2.ix, s2.iy);
+		g.rotate(Math.toRadians(-d2));
+		g.translate(-p2.ix, -p2.iy);
+//
+//		g.setColor(Color.CYAN);
+//		g.translate(p3.ix, p3.iy);
+//		g.rotate(Math.toRadians(d3));
+//		g.fillRect(0, 0, s3.ix, s3.iy);
+//		g.setColor(Color.BLACK);
+//		g.drawRect(0, 0, s3.ix, s3.iy);
+//		g.rotate(Math.toRadians(-d3));
+//		g.translate(-p3.ix, -p3.iy);
+//
+//		g.setColor(Color.CYAN);
+//		g.translate(p4.ix, p4.iy);
+//		g.rotate(Math.toRadians(d4));
+//		g.fillRect(0, 0, s4.ix, s4.iy);
+//		g.setColor(Color.BLACK);
+//		g.drawRect(0, 0, s4.ix, s4.iy);
+//		g.rotate(Math.toRadians(-d4));
+//		g.translate(-p4.ix, -p4.iy);
+//
+//		g.setColor(Color.CYAN);
+//		g.translate(p5.ix, p5.iy);
+//		g.rotate(Math.toRadians(d5));
+//		g.fillRect(0, 0, s5.ix, s5.iy);
+//		g.setColor(Color.BLACK);
+//		g.drawRect(0, 0, s5.ix, s5.iy);
+//		g.rotate(Math.toRadians(-d5));
+//		g.translate(-p5.ix, -p5.iy);
+//
+//		g.setColor(Color.CYAN);
+//		g.translate(p6.ix, p6.iy);
+//		g.rotate(Math.toRadians(d6));
+//		g.fillRect(0, 0, s6.ix, s6.iy);
+//		g.setColor(Color.BLACK);
+//		g.drawRect(0, 0, s6.ix, s6.iy);
+//		g.rotate(Math.toRadians(-d6));
+//		g.translate(-p6.ix, -p6.iy);
+//
+//		g.setColor(Color.CYAN);
+//		g.translate(p7.ix, p7.iy);
+//		g.rotate(Math.toRadians(d7));
+//		g.fillRect(0, 0, s7.ix, s7.iy);
+//		g.setColor(Color.BLACK);
+//		g.drawRect(0, 0, s7.ix, s7.iy);
+//		g.rotate(Math.toRadians(-d7));
+//		g.translate(-p7.ix, -p7.iy);
+
+		// draw fps
+		g.setColor(Color.GREEN);
+		g.drawString("FPS: " + Long.toString(fps), 10, 40);
+
+		// draw pwr & angle
+		g.drawString("POWER: " + Integer.toString(cPower), 10, 60);
+		g.drawString("ANGLE: " + Integer.toString(cAngle), 10, 80);
+
+		// release resources, show the buffer
+		g.dispose();
+		strategy.show();
+	}
+
+	boolean collides(int px1, int py1, int w1, int h1, int px2, int py2, int w2, int h2) {
+
+		return !((Math.addExact(px1, w1)) < px2 || (Math.addExact(px2, w2)) < px1 || (Math.addExact(py1, h1)) < py2
+				|| (Math.addExact(py2, h2)) < py1);
+
+	}
+
+	public void simulate() {
+
+		p1.set(random(100, 600), random(50, 400));
+		p2.set(random(100, 600), random(50, 700));
+		p3.set(random(100, 600), random(50, 700));
+		p4.set(random(100, 600), random(50, 700));
+		p5.set(random(100, 600), random(50, 700));
+		p6.set(random(100, 600), random(50, 700));
+		p7.set(random(100, 600), random(50, 700));
+
+	}
+
+	public void shoot() {
+
+		if (!ballPlay) {
+
+			ballPlay = true;
+
+			pball.setX(400);
+			pball.setY(1000);
+
+			vball.setX((float) ((cPower * Math.sin(Math.toRadians(cAngle))) * vmod));
+			vball.setY((float) ((-cPower * Math.cos(Math.toRadians(cAngle))) * vmod));
+
+		} else
+			ballPlay = false;
+
+	}
+
+	@Override
+	public void keyPressed(KeyEvent keyEvent) {
+
+		switch (keyEvent.getKeyCode()) {
+
+		case KeyEvent.VK_UP:
+			cPower++;
+			if (cPower > 100) {
+				cPower = 100;
+			}
+			break;
+
+		case KeyEvent.VK_DOWN:
+			cPower--;
+
+			if (cPower < 2) {
+				cPower = 1;
+			}
+			break;
+
+		case KeyEvent.VK_LEFT:
+			cAngle--;
+			if (cAngle < -90) {
+				cAngle = -90;
+			}
+			break;
+
+		case KeyEvent.VK_RIGHT:
+			cAngle++;
+			if (cAngle > 90) {
+				cAngle = 90;
+			}
+			break;
+
+		case KeyEvent.VK_W:
+			cPower++;
+			if (cPower > 100) {
+				cPower = 100;
+			}
+			break;
+
+		case KeyEvent.VK_S:
+			cPower--;
+
+			if (cPower < 2) {
+				cPower = 1;
+			}
+			break;
+
+		case KeyEvent.VK_A:
+			cAngle--;
+			if (cAngle < -90) {
+				cAngle = -90;
+			}
+			break;
+
+		case KeyEvent.VK_D:
+			cAngle++;
+			if (cAngle > 90) {
+				cAngle = 90;
+			}
+			break;
+
+		case KeyEvent.VK_SPACE:
+			shoot();
+			break;
+
+		case KeyEvent.VK_P:
+			simulate();
+			break;
+		}
+	}
+
+	public void run() {
+		init();
+
+		while (isRunning) {
+			// new loop, clock the start
+			startFrame = System.currentTimeMillis();
+			// calculate delta time
+			dt = (float) (startFrame - lastFrame) / 1000;
+			// log the current time
+			lastFrame = startFrame;
+
+			// call update and draw methods
+			update();
+			draw();
+
+			// dynamic thread sleep, only sleep the time we need to cap the framerate
+			rest = (1000 / MAX_FPS) - (System.currentTimeMillis() - startFrame);
+			if (rest > 0) {
+				try {
+					Thread.sleep(rest);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+	}
+
+	@Override
+	public void keyReleased(KeyEvent keyEvent) {
+
+	}
+
+	@Override
+	public void keyTyped(KeyEvent keyEvent) {
+
+	}
+}
+
+/*
+ * TODO: rotated rectangle collision, bounce counter, levels, make it so power
+ * <50 is viable and doesnt launch the ball 3 inches, sprites maybe(?)
+ * 
+ */
