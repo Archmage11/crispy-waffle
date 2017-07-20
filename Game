@@ -3,7 +3,6 @@ import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.image.BufferStrategy;
-import java.util.ArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Game extends JFrame implements KeyListener {
@@ -69,8 +68,19 @@ public class Game extends JFrame implements KeyListener {
 	float vmod = 10.4f;
 	float gravmod = 1.0f;
 
-	int bouncesLeft;
-	int bounces;
+	int bouncesLeft = 1;
+
+	int level = 1;
+
+	int invTimer = 10;
+
+	int collisionCounter = 0;
+
+	boolean collided = false;
+
+	boolean lost = false;
+
+	boolean levelUp = false;
 
 	float T = 0.01f;
 
@@ -116,50 +126,27 @@ public class Game extends JFrame implements KeyListener {
 
 	}
 
-	boolean checkCollision(Vector rectP, Vector rectSz, float rectD, Vector ballP, Vector ballV) {
+	void modifyVelocity(float wallRad, Vector ballV, Vector ballP) {
+		if (wallRad < Math.PI / 2)
+			ballV.rotate((float) ((float) ((wallRad + ballV.dir()) * 2.0f) + Math.PI));
+		else
+			ballV.rotate((float) ((float) (ballV.dir() + (wallRad) * -2.0f) + Math.PI));
 
-		Vector bottomright = Vector.add(rectP, rectSz);
-		Vector topright = new Vector(rectP.x + rectSz.x, rectP.y);
-		Vector bottomleft = new Vector(rectP.x, rectP.x + rectSz.y);
-
-		ArrayList<Vector> corners = new ArrayList<Vector>() {
-			{
-				add(rectP);
-				add(topright);
-				add(bottomright);
-				add(bottomleft);
-			}
-		};
-
-		for (int i = 1; i < corners.size(); i++) {
-			corners.get(i).add(Vector.rotate(Vector.sub(rectP, corners.get(i)), rectD));
-		}
-
-		Vector ballCheck = Vector.add(ballP, Vector.mult(ballV, T));
-
-		for (int i = 1; i < corners.size(); i++) {
-			if (intersecting(corners.get(i - 1), corners.get(i), ballP, ballCheck)) {
-				modifyVelocity(Vector.sub(corners.get(i - 1), corners.get(i)), ballV);
-				return true;
-			}
-		}
-		
-		return false;
-
-	}
-
-	boolean intersecting(Vector A, Vector B, Vector P, Vector Q) {
-		int case1 = (int) (((B.x - A.x) * (P.y - B.y)) - ((B.y - A.y) * (P.x - B.x)));
-		int case2 = (int) (((B.x - A.x) * (P.y - B.y)) - ((B.y - A.y) * (P.x - B.x)));
-
-		return !((case1 > 0 && case2 > 0) || (case1 < 0 && case2 < 0));
-	}
-
-	void modifyVelocity(Vector wall, Vector ballV) {
-		ballV.rotate(Vector.getAngle(ballV, wall) * -2.0f);
+		ballV.mult(0.75f);
+		ballP.add(Vector.mult(ballV, (float) 0.05));
+		System.out.println("Wall angle: " + wallRad);
+		System.out.println("Ball angle: " + ballV.dir());
 	}
 
 	private void update() {
+
+		// if (bouncesLeft < 0) {
+		// lost = true;
+		// }
+
+		if (collided = true) {
+			collisionCounter++;
+		}
 
 		// update current fps
 		fps = (int) (1f / dt);
@@ -217,105 +204,130 @@ public class Game extends JFrame implements KeyListener {
 
 		}
 
-		checkCollision(p1, s1, (float) Math.toRadians(d1), pball, vball);
-		checkCollision(p2, s2, (float) Math.toRadians(d2), pball, vball);
-		System.err.println(checkCollision(p1, s1, (float) Math.toRadians(d1), pball, vball));
-		
-			
-		
-		
-		// if (checkcollide(d1, pball.ix, pball.iy, p1.ix, p1.iy, s1.ix, s1.iy)) {
-		//
-		// }
-		// if (checkcollide(d2, pball.ix, pball.iy, p2.ix, p2.iy, s2.ix, s2.iy)) {
-		//
-		// }
-		// if (checkcollide(d3, pball.ix, pball.iy, p3.ix, p3.iy, s3.ix, s3.iy)) {
-		//
-		// }
-		// if (checkcollide(d4, pball.ix, pball.iy, p4.ix, p4.iy, s4.ix, s4.iy)) {
-		//
-		// }
-		// if (checkcollide(d5, pball.ix, pball.iy, p5.ix, p5.iy, s5.ix, s5.iy)) {
-		//
-		// }
-		// if (checkcollide(d6, pball.ix, pball.iy, p6.ix, p6.iy, s6.ix, s6.iy)) {
-		//
-		// }
-		// if (checkcollide(d7, pball.ix, pball.iy, p7.ix, p7.iy, s7.ix, s7.iy)) {
-		//
-		// }
-		// if (checkcollide(0, pball.ix, pball.iy, 0, 0, 800, 10)) {
-		//
-		// }
-		// if (checkcollide(0, pball.ix, pball.iy, 0, 0, 10, 1000)) {
-		//
-		// }
-		// if (checkcollide(0, pball.ix, pball.iy, 800, 0, 10, 1000)) {
-		//
-		// }
-
-		// gravity
+		// checkCollision(p1, s1, (float) Math.toRadians(d1), pball, vball);
+		// checkCollision(p2, s2, (float) Math.toRadians(d2), pball, vball);
 		if (ballPlay) {
+			if (collisionCounter > invTimer) {
 
+				if (checkcollide(d1, pball.ix, pball.iy, p1.ix, p1.iy, s1.ix, s1.iy)) {
+					modifyVelocity((float) Math.toRadians(d1), vball, pball);
+
+					if (bouncesLeft == 0) {
+						levelUp = true;
+
+					}
+
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d2, pball.ix, pball.iy, p2.ix, p2.iy, s2.ix, s2.iy)) {
+					modifyVelocity((float) Math.toRadians(d2), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d3, pball.ix, pball.iy, p3.ix, p3.iy, s3.ix, s3.iy)) {
+					modifyVelocity((float) Math.toRadians(d3), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d4, pball.ix, pball.iy, p4.ix, p4.iy, s4.ix, s4.iy)) {
+					modifyVelocity((float) Math.toRadians(d4), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d5, pball.ix, pball.iy, p5.ix, p5.iy, s5.ix, s5.iy)) {
+					modifyVelocity((float) Math.toRadians(d5), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d6, pball.ix, pball.iy, p6.ix, p6.iy, s6.ix, s6.iy)) {
+					modifyVelocity((float) Math.toRadians(d6), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				if (checkcollide(d7, pball.ix, pball.iy, p7.ix, p7.iy, s7.ix, s7.iy)) {
+					modifyVelocity((float) Math.toRadians(d7), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				
+				//walls
+				if (checkcollide(0, pball.ix, pball.iy, 0, 0, 800, 10)) {
+					modifyVelocity((float) Math.toRadians(0), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				
+				if (checkcollide(90, pball.ix, pball.iy, 0, 0, 800, 10)) {
+					modifyVelocity((float) Math.toRadians(90), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+				
+				if (checkcollide(0, pball.ix, pball.iy, 0, 0, 800, 10)) {
+					modifyVelocity((float) Math.toRadians(0), vball, pball);
+					bouncesLeft--;
+					collided = true;
+					collisionCounter = 0;
+				}
+			}
+
+			// gravity
 			vball.setY(vball.iy += pball.iy * dt * gravmod);
-		}
-
-		if (pball.ix < 0 || pball.ix > 800 || pball.iy < 0 || pball.iy > 1000) {
-			ballPlay = false;
 		}
 
 	}
 
-	// public double findDistance(double fromX, double fromY, double toX, double
-	// toY) {
-	// double a = Math.abs(fromX - toX);
-	// double b = Math.abs(fromY - toY);
-	//
-	// return Math.sqrt((a * a) + (b * b));
-	// }
-	//
-	// public boolean checkcollide(int rot, int xball, int yball, int xrect, int
-	// yrect, int w, int h) {
-	//
-	// double unrotatedCircleX = Math.cos(Math.toRadians(-rot)) * (xball - (xrect +
-	// (1 / 2) * w))
-	// - Math.sin(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (xrect +
-	// (1 / 2) * w);
-	// double unrotatedCircleY = Math.sin(Math.toRadians(-rot)) * (xball - (xrect +
-	// (1 / 2) * w))
-	// + Math.cos(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (yrect +
-	// (1 / 2) * h);
-	//
-	// // Closest point in the rectangle to the center of circle rotated
-	// // backwards(unrotated)
-	// double closestX, closestY;
-	//
-	// // Find the unrotated closest x point from center of unrotated circle
-	// if (unrotatedCircleX < xrect)
-	// closestX = xrect;
-	// else if (unrotatedCircleX > xrect + w)
-	// closestX = xrect + w;
-	// else
-	// closestX = unrotatedCircleX;
-	//
-	// // Find the unrotated closest y point from center of unrotated circle
-	// if (unrotatedCircleY < yrect)
-	// closestY = yrect;
-	// else if (unrotatedCircleY > yrect + h)
-	// closestY = yrect + h;
-	// else
-	// closestY = unrotatedCircleY;
-	//
-	// // Determine collision
-	//
-	// double distance = findDistance(unrotatedCircleX, unrotatedCircleY, closestX,
-	// closestY);
-	// if (distance < ballRadius) {
-	// return true; // Collision
-	// } else
-	// return false;
-	// }
+	public double findDistance(double fromX, double fromY, double toX, double toY) {
+		double a = Math.abs(fromX - toX);
+		double b = Math.abs(fromY - toY);
+
+		return Math.sqrt((a * a) + (b * b));
+	}
+
+	public boolean checkcollide(int rot, int xball, int yball, int xrect, int yrect, int w, int h) {
+
+		double unrotatedCircleX = Math.cos(Math.toRadians(-rot)) * (xball - (xrect + (1 / 2) * w))
+				- Math.sin(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (xrect + (1 / 2) * w);
+		double unrotatedCircleY = Math.sin(Math.toRadians(-rot)) * (xball - (xrect + (1 / 2) * w))
+				+ Math.cos(Math.toRadians(-rot)) * (yball - (yrect + (1 / 2) * h)) + (yrect + (1 / 2) * h);
+
+		// Closest point in the rectangle to the center of circle rotated
+		// backwards(unrotated)
+		double closestX, closestY;
+
+		// Find the unrotated closest x point from center of unrotated circle
+		if (unrotatedCircleX < xrect)
+			closestX = xrect;
+		else if (unrotatedCircleX > xrect + w)
+			closestX = xrect + w;
+		else
+			closestX = unrotatedCircleX;
+
+		// Find the unrotated closest y point from center of unrotated circle
+		if (unrotatedCircleY < yrect)
+			closestY = yrect;
+		else if (unrotatedCircleY > yrect + h)
+			closestY = yrect + h;
+		else
+			closestY = unrotatedCircleY;
+
+		// Determine collision
+
+		double distance = findDistance(unrotatedCircleX, unrotatedCircleY, closestX, closestY);
+		if (distance < ballRadius) {
+			return true; // Collision
+		} else
+			return false;
+	}
 
 	public void bcollide() {
 
@@ -330,96 +342,120 @@ public class Game extends JFrame implements KeyListener {
 		g.setColor(Color.blue);
 		g.fillRect(0, 0, WIDTH, HEIGHT);
 
-		if (ballPlay) {
-			g.setColor(Color.GREEN);
-			g.fillOval(pball.ix - 10, pball.iy - 10, ballRadius * 2, ballRadius * 2);
-
+		if (levelUp) {
+			g.dispose();
+			g.setColor(Color.black);
+			g.setFont(new Font("TimesRoman", Font.PLAIN, 68));
+			g.drawString("Level Up!", 200, 500);
+			g.setFont(new Font("TimesRoman", Font.PLAIN, 24));
+			level++;
+			g.drawString("Level: " + (level), 215, 580);
 		}
 
-		// draw cannon barrel
-		g.setColor(Color.BLACK);
-		g.translate(400, 1000);
-		g.rotate(Math.toRadians(cAngle));
-		g.fillRect(-15, -cPower, 30, cPower);
-		g.rotate(Math.toRadians(-cAngle));
-		g.translate(-400, -1000);
+		if (!lost) {
 
-		// draw cyan part of cannon
-		g.setColor(Color.CYAN);
-		g.fillArc(350, 965, 100, 100, 0, 180);
+			if (ballPlay) {
+				g.setColor(Color.GREEN);
+				g.fillOval(pball.ix - 10, pball.iy - 10, ballRadius * 2, ballRadius * 2);
 
-		// draw rectangles
-		g.setColor(Color.DARK_GRAY);
-		g.translate(p1.ix, p1.iy);
-		g.rotate(Math.toRadians(d1));
-		g.fillRect(0, 0, s1.ix, s1.iy);
-		g.setColor(Color.BLACK);
-		g.drawRect(0, 0, s1.ix, s1.iy);
-		g.rotate(Math.toRadians(-d1));
-		g.translate(-p1.ix, -p1.iy);
+			}
 
-		g.setColor(Color.CYAN);
-		g.translate(p2.ix, p2.iy);
-		g.rotate(Math.toRadians(d2));
-		g.fillRect(0, 0, s2.ix, s2.iy);
-		g.setColor(Color.BLACK);
-		g.drawRect(0, 0, s2.ix, s2.iy);
-		g.rotate(Math.toRadians(-d2));
-		g.translate(-p2.ix, -p2.iy);
-//
-//		g.setColor(Color.CYAN);
-//		g.translate(p3.ix, p3.iy);
-//		g.rotate(Math.toRadians(d3));
-//		g.fillRect(0, 0, s3.ix, s3.iy);
-//		g.setColor(Color.BLACK);
-//		g.drawRect(0, 0, s3.ix, s3.iy);
-//		g.rotate(Math.toRadians(-d3));
-//		g.translate(-p3.ix, -p3.iy);
-//
-//		g.setColor(Color.CYAN);
-//		g.translate(p4.ix, p4.iy);
-//		g.rotate(Math.toRadians(d4));
-//		g.fillRect(0, 0, s4.ix, s4.iy);
-//		g.setColor(Color.BLACK);
-//		g.drawRect(0, 0, s4.ix, s4.iy);
-//		g.rotate(Math.toRadians(-d4));
-//		g.translate(-p4.ix, -p4.iy);
-//
-//		g.setColor(Color.CYAN);
-//		g.translate(p5.ix, p5.iy);
-//		g.rotate(Math.toRadians(d5));
-//		g.fillRect(0, 0, s5.ix, s5.iy);
-//		g.setColor(Color.BLACK);
-//		g.drawRect(0, 0, s5.ix, s5.iy);
-//		g.rotate(Math.toRadians(-d5));
-//		g.translate(-p5.ix, -p5.iy);
-//
-//		g.setColor(Color.CYAN);
-//		g.translate(p6.ix, p6.iy);
-//		g.rotate(Math.toRadians(d6));
-//		g.fillRect(0, 0, s6.ix, s6.iy);
-//		g.setColor(Color.BLACK);
-//		g.drawRect(0, 0, s6.ix, s6.iy);
-//		g.rotate(Math.toRadians(-d6));
-//		g.translate(-p6.ix, -p6.iy);
-//
-//		g.setColor(Color.CYAN);
-//		g.translate(p7.ix, p7.iy);
-//		g.rotate(Math.toRadians(d7));
-//		g.fillRect(0, 0, s7.ix, s7.iy);
-//		g.setColor(Color.BLACK);
-//		g.drawRect(0, 0, s7.ix, s7.iy);
-//		g.rotate(Math.toRadians(-d7));
-//		g.translate(-p7.ix, -p7.iy);
+			// draw cannon barrel
+			g.setColor(Color.BLACK);
+			g.translate(400, 1000);
+			g.rotate(Math.toRadians(cAngle));
+			g.fillRect(-15, -cPower, 30, cPower);
+			g.rotate(Math.toRadians(-cAngle));
+			g.translate(-400, -1000);
 
-		// draw fps
-		g.setColor(Color.GREEN);
-		g.drawString("FPS: " + Long.toString(fps), 10, 40);
+			// draw cyan part of cannon
+			g.setColor(Color.CYAN);
+			g.fillArc(350, 965, 100, 100, 0, 180);
 
-		// draw pwr & angle
-		g.drawString("POWER: " + Integer.toString(cPower), 10, 60);
-		g.drawString("ANGLE: " + Integer.toString(cAngle), 10, 80);
+			// draw rectangles
+			g.setColor(Color.DARK_GRAY);
+			g.translate(p1.ix, p1.iy);
+			g.rotate(Math.toRadians(d1));
+			g.fillRect(0, 0, s1.ix, s1.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s1.ix, s1.iy);
+			g.rotate(Math.toRadians(-d1));
+			g.translate(-p1.ix, -p1.iy);
 
+			g.setColor(Color.CYAN);
+			g.translate(p2.ix, p2.iy);
+			g.rotate(Math.toRadians(d2));
+			g.fillRect(0, 0, s2.ix, s2.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s2.ix, s2.iy);
+			g.rotate(Math.toRadians(-d2));
+			g.translate(-p2.ix, -p2.iy);
+
+			g.setColor(Color.CYAN);
+			g.translate(p3.ix, p3.iy);
+			g.rotate(Math.toRadians(d3));
+			g.fillRect(0, 0, s3.ix, s3.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s3.ix, s3.iy);
+			g.rotate(Math.toRadians(-d3));
+			g.translate(-p3.ix, -p3.iy);
+
+			g.setColor(Color.CYAN);
+			g.translate(p4.ix, p4.iy);
+			g.rotate(Math.toRadians(d4));
+			g.fillRect(0, 0, s4.ix, s4.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s4.ix, s4.iy);
+			g.rotate(Math.toRadians(-d4));
+			g.translate(-p4.ix, -p4.iy);
+
+			g.setColor(Color.CYAN);
+			g.translate(p5.ix, p5.iy);
+			g.rotate(Math.toRadians(d5));
+			g.fillRect(0, 0, s5.ix, s5.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s5.ix, s5.iy);
+			g.rotate(Math.toRadians(-d5));
+			g.translate(-p5.ix, -p5.iy);
+
+			g.setColor(Color.CYAN);
+			g.translate(p6.ix, p6.iy);
+			g.rotate(Math.toRadians(d6));
+			g.fillRect(0, 0, s6.ix, s6.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s6.ix, s6.iy);
+			g.rotate(Math.toRadians(-d6));
+			g.translate(-p6.ix, -p6.iy);
+
+			g.setColor(Color.CYAN);
+			g.translate(p7.ix, p7.iy);
+			g.rotate(Math.toRadians(d7));
+			g.fillRect(0, 0, s7.ix, s7.iy);
+			g.setColor(Color.BLACK);
+			g.drawRect(0, 0, s7.ix, s7.iy);
+			g.rotate(Math.toRadians(-d7));
+			g.translate(-p7.ix, -p7.iy);
+
+			// draw fps
+			g.setColor(Color.GREEN);
+			g.drawString("FPS: " + Long.toString(fps), 10, 40);
+
+			// draw pwr & angle
+			g.drawString("POWER: " + Integer.toString(cPower), 10, 60);
+			g.drawString("ANGLE: " + Integer.toString(cAngle), 10, 80);
+
+			g.drawString("Bounces Left: " + Integer.toString(bouncesLeft), 200, 900);
+			g.drawString("LEVEL: " + Integer.toString(level), 500, 900);
+		}
+
+		// loss screen
+		else if (lost) {
+			g.setColor(Color.black);
+			g.setFont(new Font("TimesRoman", Font.PLAIN, 68));
+			g.drawString("Game Over", 200, 500);
+			g.setFont(new Font("TimesRoman", Font.PLAIN, 24));
+			g.drawString("Score: " + (level - 1), 215, 580);
+		}
 		// release resources, show the buffer
 		g.dispose();
 		strategy.show();
@@ -442,6 +478,14 @@ public class Game extends JFrame implements KeyListener {
 		p6.set(random(100, 600), random(50, 700));
 		p7.set(random(100, 600), random(50, 700));
 
+		d1 = (int) (random(1, 180));
+		d2 = (int) (random(1, 180));
+		d3 = (int) (random(1, 180));
+		d4 = (int) (random(1, 180));
+		d5 = (int) (random(1, 180));
+		d5 = (int) (random(1, 180));
+		d6 = (int) (random(1, 180));
+
 	}
 
 	public void shoot() {
@@ -456,8 +500,11 @@ public class Game extends JFrame implements KeyListener {
 			vball.setX((float) ((cPower * Math.sin(Math.toRadians(cAngle))) * vmod));
 			vball.setY((float) ((-cPower * Math.cos(Math.toRadians(cAngle))) * vmod));
 
+			bouncesLeft = level;
+
 		} else
 			ballPlay = false;
+		bouncesLeft = level;
 
 	}
 
@@ -531,6 +578,14 @@ public class Game extends JFrame implements KeyListener {
 		case KeyEvent.VK_P:
 			simulate();
 			break;
+
+		case KeyEvent.VK_L:
+			if (!lost)
+				lost = true;
+			if (lost) {
+				lost = false;
+			}
+			break;
 		}
 	}
 
@@ -574,7 +629,7 @@ public class Game extends JFrame implements KeyListener {
 }
 
 /*
- * TODO: rotated rectangle collision, bounce counter, levels, make it so power
- * <50 is viable and doesnt launch the ball 3 inches, sprites maybe(?)
+ * TODO: rotated rectangle collision, make it so power <50 is viable and doesnt
+ * launch the ball 3 inches, sprites maybe(?)
  * 
  */
